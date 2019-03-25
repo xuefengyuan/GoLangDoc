@@ -1,6 +1,6 @@
 [TOC]
 
-## 一、defer使用注意事项
+### 一、defer使用注意事项
 
 `defer`是Go语言提供的一种用于注册延迟调用的机制：让函数或语句可以在当前函数执行完毕后（包括通过return正常结束或者panic导致的异常结束）执行。 
 
@@ -10,7 +10,7 @@
 
 [GoLang之轻松化解defer的温柔陷阱](https://www.cnblogs.com/qcrao-2018/p/10367346.html)
 
-### 1、合理的使用defer
+#### 1、合理的使用defer
 
 使用defer的时候需要对`err`和`对象`进行判断，以免造成隐形的panic
 
@@ -25,7 +25,29 @@ if f != nil {
 }
 ```
 
+### 二、不要使用+和fmt.Sprinft操作字符串
 
+#### 1、最有效的方式buffer
+
+```go
+strBuf := bytes.NewBufferString("")
+for i := 0; i<1000; i++{
+    strBuf.WriteString("test")
+}
+```
+
+#### 2、使用strings.Join()
+
+```go
+a,b := "Hello","World"
+for i:=0; i < 1000; i++{
+    strings.Join([]string{a,b},"")
+}
+```
+
+### 三、对于有固定字段的键值对，用临时Struct，不要用map[string]interface{}
+
+> 用临时Struct在运行期间不需要动态分配内存，并且不需要像map那样去检查索引，所以速度快很多。
 
 
 
