@@ -8,7 +8,11 @@
 # 命令格式：
 docker ps
 # 命令演示：
+# 查看已启动的容器
 $ docker ps
+# 查看全部容器，包括未启动的
+$ docker ps -a
+
 # CONTAINER ID 容器ID
 # IMAGE 基于那个镜像
 # COMMAND 运行镜像使用了哪些命令？
@@ -35,7 +39,7 @@ docker create [参数命令] 依赖镜像 [容器内命令] [命令参数]
 COMMAND 表示容器启动后，需要在容器中执行的命令，如ps、ls 等命令
 ARG 表示执行 COMMAND 时需要提供的一些参数，如ps 命令的 aux、ls命令的-a等等
 # 命令演示：创建容器（附上ls命令和a参数）
-$ docker create -it --name ubuntu-panda01 ubuntu ls -al
+$ docker create -it --name ubuntu-test1 ubuntu ls -al
 ```
 
 ### 3）：启动容器
@@ -54,7 +58,7 @@ docker start [容器名称]或[容器ID]
 -a, --attach 将当前shell的 STDOUT/STDERR 连接到容器上
 -i, --interactive 将当前shell的 STDIN连接到容器上
 # 命令演示：启动上面创建的容器
-$ docker start -a ubuntu-panda01
+$ docker start -a ubuntu-test1
 ```
 
 #### 3.2）：创建新容器并启动
@@ -69,7 +73,7 @@ docker run [命令参数] [镜像名称][执行的命令]
 -d, --detach 在后台运行容器并打印出容器ID
 --rm 当容器退出运行后，自动删除容器
 # 启动一个镜像输出内容并删除容器
-docker run --rm --name nginx01 nginx /bin/echo "hello docker"
+$ docker run --rm --name nginx-test1 nginx /bin/echo "hello docker"
 # 注意：
 docker run 其实 是两个命令的集合体 docker create + docker start
 ```
@@ -80,7 +84,7 @@ docker run 其实 是两个命令的集合体 docker create + docker start
 # 命令格式：
 docker run -d [image_name] command ...
 # 命令演示：守护进程方式启动容器
-docker run -d --name nginx02 nginx
+$ docker run -d --name nginx-test2 nginx
 ```
 
 ### 4）：容器暂停
@@ -89,7 +93,7 @@ docker run -d --name nginx02 nginx
 # 命令格式：
 docker pause [容器名称]或[容器ID]
 # 暂停容器
-docker pause nginx02
+$ docker pause nginx-test2
 ```
 
 ### 5）：容器取消暂停
@@ -98,7 +102,7 @@ docker pause nginx02
 # 命令格式：
 docker unpause [容器名称]或[容器ID]
 # 恢复容器
-docker unpause nginx02
+$ docker unpause nginx-test2
 ```
 
 ### 6）：重启容器
@@ -109,7 +113,7 @@ docker restart [容器名称]或[容器ID]
 # 命令参数(OPTIONS)：
 -t, --time int 重启前，等待的时间，单位秒(默认 10s)
 # 恢复容器
-docker restart -t 20 nginx02
+$ docker restart -t 20 nginx-test2
 ```
 
 ### 7）：关闭容器
@@ -118,7 +122,7 @@ docker restart -t 20 nginx02
 # 命令格式：
 docker stop [容器名称]或[容器ID]
 # 关闭容器:
-docker stop nginx02
+$ docker stop nginx-test2
 ```
 
 ### 8）：终止容器
@@ -127,7 +131,7 @@ docker stop nginx02
 # 命令格式：
 docker kill [容器名称]或[容器ID]
 # 终止容器
-docker kill nginx02
+$ docker kill nginx-test2
 ```
 
 ### 9）：删除容器
@@ -140,7 +144,7 @@ docker kill nginx02
 # 命令格式：
 docker rm [容器名称]或[容器ID]
 # 删除已关闭的容器:
-docker rm nginx02
+$ docker rm nginx-test2
 ```
 
 #### 9.2）：强制删除运行容器
@@ -149,7 +153,7 @@ docker rm nginx02
 # 命令格式：
 docker rm -f [容器名称]或[容器ID]
 # 删除正在运行的容器
-docker rm -f nginx02
+$ docker rm -f nginx-test2
 ```
 
 #### 9.3）：批量删除容器
@@ -158,6 +162,7 @@ docker rm -f nginx02
 # 命令格式：
 docker rm -f $(docker ps -a -q)
 # 按照执行顺序$（）， 获取到现在容器的id然后进行删除
+$ docker rm -f $(docker ps -a -q)
 ```
 
 ### 10）：进入容器
@@ -169,11 +174,13 @@ docker rm -f $(docker ps -a -q)
 
 #### 10.1）：创建并进入容器
 
+> <font color=red>注意：需要进入的容器，要先启动才可以进入</font>
+
 ```shell
 # 命令格式：
 docker run --name [container_name] -it [docker_image] /bin/bash
 # 命令演示：
-docker run -it --name nginx01 nginx /bin/bash
+$ docker run -it --name nginx-test1 nginx /bin/bash
 # 进入容器后
 root@ddf8345076af:/# echo "hello world"
 hello world
@@ -189,7 +196,7 @@ exit
 **创建并进入Ubuntu容器**
 
 ```shell
-docker run -dit --name ubuntu01 ubuntu /bin/bash
+$ docker run -dit --name ubuntu01 ubuntu /bin/bash
 ```
 
 #### 10.2）：手工方式进入容器
@@ -198,12 +205,20 @@ docker run -dit --name ubuntu01 ubuntu /bin/bash
 # 命令格式：
 docker exec -it 容器id /bin/bash
 # 效果演示：
-docker exec -it ddf8345076af /bin/bash
+$ docker exec -it ddf8345076af /bin/bash
+$ docker exec -it ubuntu-test1 /bin/bash
 ```
 
 #### 10.3）：生产方式进入容器
 
 生产中常用的进入容器方法是使用脚本，脚本内容如下
+
+```shell
+# 创建一个脚本文件
+vim docker_in.sh
+```
+
+脚本文件内容
 
 ```shell
 #!/bin/bash
@@ -220,9 +235,10 @@ docker_in $1
 
 ```shell
 # 赋权执行
-chmod +x docker_in.sh
-# 进入指定的容器，并测试
-sudo ./docker_in.sh b3fbcba852fd
+$ chmod +x docker_in.sh
+# 进入指定的容器，并测试,容器id和容器名称都可以
+$ sudo ./docker_in.sh b3fbcba852fd
+$ sudo ./docker_in.sh nginx-test1
 ```
 
 注意：
@@ -252,20 +268,23 @@ Ctrl + D
 # 命令格式
 docker commit -m '改动信息' -a "作者信息" [container_id][new_image:tag]
 # 命令演示：
-# 进入一个容器，创建文件后并退出:
-./docker_in.sh d74fff341687
+# 1/进入一个容器，创建文件后并退出:
+$ sudo ./docker_in.sh d74fff341687
+$ sudo ./docker_in.sh nginx-test1
 mkdir /hello
 mkdir /world
 ls
 exit
-# 创建一个镜像:
-docker commit -m 'mkdir /hello /world ' -a "panda" d74fff341687 nginx:v0.2
+# 2、创建一个镜像: (用容器id和容器名称都可以创建镜像)
+$ docker commit -m 'mkdir /hello /world ' -a "ybd" d74fff341687 nginx:v0.2
+$ docker commit -m 'mkdir /hello /world ' -a "ybd" nginx-test1 nginx:v0.2
 # 查看镜像:
-docker images
+$ docker images
 # 启动一个容器
-docker run -itd nginx:v0.2 /bin/bash
+$ docker run -itd nginx:v0.2 /bin/bash
+$ docker run -it --name nginx-test2 nginx:v0.2 /bin/bash
 # 进入容器进行查看
-./docker_in.sh ae63ab299a84
+$ sudo ./docker_in.sh nginx-test2
 ls
 ```
 
@@ -276,9 +295,14 @@ ls
 docker export [容器id] > 模板文件名.tar
 # 命令演示：
 # 创建镜像:
-docker export ae63ab299a84 > nginx.tar
+$ docker export ae63ab299a84 > nginx.tar
+$ docker export nginx-test1 > nginx-test.tar
+# 导出的时候也可以指定镜像tar包存放位置，不指定则默认在当前执行命令的目录下
+$ docker export nginx-test1 > ./images/nginx-test.tar
 # 导入镜像:
 $ cat nginx.tar | docker import - panda-test
+# 查看镜像
+$ docker images
 ```
 
 ### 13）：容器其它命令
@@ -299,9 +323,9 @@ docker logs 7c5a24a68f96
 docker inspect [容器id]
 # 命令效果：
 # 查看容器全部信息:
-docker inspect 930f29ccdf8a
+$ docker inspect 930f29ccdf8a
 # 查看容器网络信息:
-docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 容器id
+$ docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 容器id
 ```
 
 #### 13.3）：查看容器端口信息
@@ -310,7 +334,7 @@ docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}
 # 命令格式：
 docker port [容器id]
 # 命令效果：
-docker port 930f29ccdf8a
+$ docker port 930f29ccdf8a
 # 没有效果没有和宿主机关联
 ```
 
@@ -320,7 +344,7 @@ docker port 930f29ccdf8a
 # 命令格式：
 docker rename [容器id]或[容器名称] [容器新名称]
 # 命令效果：
-docker rename 930f29ccdf8a newname
+$ docker rename 930f29ccdf8a newname
 ```
 
 
