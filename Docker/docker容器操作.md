@@ -20,7 +20,7 @@ $ docker ps -a
 # STATUS 开启还是关闭
 # PORTS端口号
 # NAMES容器名称默认是随机的
-#注意：
+# 注意：
 # 管理docker容器可以通过名称，也可以通过ID
 # ps是显示正在运行的容器， -a是显示所有运行过的容器，包括已经不运行的容器
 ```
@@ -215,7 +215,7 @@ $ docker exec -it ubuntu-test1 /bin/bash
 
 ```shell
 # 创建一个脚本文件
-vim docker_in.sh
+$ vim docker_in.sh
 ```
 
 脚本文件内容
@@ -313,7 +313,7 @@ $ docker images
 # 命令格式：
 docker logs [容器id]
 # 命令效果：
-docker logs 7c5a24a68f96
+$ docker logs 7c5a24a68f96
 ```
 
 #### 13.2）：查看容器详细信息
