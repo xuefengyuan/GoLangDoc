@@ -347,8 +347,6 @@ docker rename [容器id]或[容器名称] [容器新名称]
 $ docker rename 930f29ccdf8a newname
 ```
 
-
-
 ## 四、Docker数据管理
 
 ### 1）：数据卷之目录
@@ -358,24 +356,28 @@ $ docker rename 930f29ccdf8a newname
 docker run -itd --name [容器名字] -v [宿主机目录]:[容器目录][镜像名称] [命令(可选)]
 # 命令演示：
 # 创建测试文件:
-echo "file1" > tmp/file1.txt
-# 启动一个容器，挂载数据卷:
-docker run -itd --name test-nginx -v /home/darry/testdocker/:/dockertest/ nginx
+$ mkdir images
+$ cd 
+echo "file1" > images/file1.txt
+# 启动一个容器，挂载数据卷:(宿主机目录要用绝对路径)
+$ docker run -itd --name test-nginx -v /home/darry/images/:/dockertest/ nginx
 # 注意宿主机目录需要绝对路径
 # 测试效果
-docker exec -it 4470d3ff34b8 /bin/bash
+$ docker exec -it 4470d3ff34b8 /bin/bash
 # 执行相关的目录操作命令
 ```
 
 ### 2）：数据卷容器
 
-#### 2.1）：创建一个数据圈容器
+#### 2.1）：创建一个数据卷容器
 
 ```shell
 # 命令格式：
 docker create -v [容器数据卷目录] --name [容器名字][镜像名称] [命令(可选)]
 # 执行效果
-docker create -v /data --name v1-nginx nginx
+$ docker create -v /data --name nginx-data1 nginx
+# 启动容器
+$ docker start nginx-data1
 ```
 
 #### 2.2）：创建两个容器，同时挂载数据卷容器
@@ -386,23 +388,25 @@ docker run --volumes-from [数据卷容器id/name] -tid --name [容器名字][�
 选)]
 # 执行效果：
 # 创建 v1-test1 容器:
-docker run --volumes-from d4bf68189dc4 -tid --name v1-test1 nginx /bin/bash
+$ docker run --volumes-from nginx-data1 -tid --name nginx-data2 nginx /bin/bash
 # 创建 v1-test2 容器:
-docker run --volumes-from d4bf68189dc4 -tid --name v1-test2 nginx /bin/bash
+$ docker run --volumes-from nginx-data1 -tid --name nginx-data3 nginx /bin/bash
 ```
 
 #### 2.3）：确认卷容器共享
 
 ```shell
-# 1、先进v1-test1容器
-docker exec -it v1-test1 /bin/bash
-# 在v1-test里面进行相应的操作
-# 2、先进v1-test2容器
-docker exec -it v1-test2 /bin/bash
-# 在v2-test里面进行v1-test操作的验证
+# 1、先进nginxg-data2容器
+$ docker exec -it nginxg-data2 /bin/bash
+# 在nginxg-data2里面进行相应的操作，如创建文件目录
+# 2、先进nginxg-data3容器
+$ docker exec -it nginxg-data3 /bin/bash
+# 在nginxg-data3里面进行nginxg-data2操作的验证，可相互写入文件和创建目录，在两个容器之间相互验证
 ```
 
 #### 3）：数据备份
+
+![Docker_数据备份](assets/Docker_数据备份.jpg)
 
 数据备份方案： 
 
@@ -417,12 +421,52 @@ docker run --rm --volumes-from [数据卷容器id/name] -v [宿主机目录]:[�
 # [备份命令]
 # 命令演示：
 # 创建备份目录:
-mkdir /home/darry/testdocker/dockerdata
+$ mkdir /home/darry/testdata
 # 创建备份的容器:
-docker run --rm --volumes-from v1-nginx -v /home/darry/testdocker/dockerdata/:/dockerdata/ nginx tar zcPf /dockerdata/data.tar.gz /data
+$ docker run --rm --volumes-from nginx-data1 -v /home/darry/testdata/:/backup/ nginx tar zcPf /backup/data.tar.gz /data
+# 说明
+# docker run --rm --volumes-from nginx-data1(要备份的数据容器) -v /home/darry/testdata（挂载的本地宿主机目录）/:/backup/（新建备份容器的映射目录） nginx tar zcPf /backup/data.tar.gz（将要备份的数据容器压缩到新建的备份容器目录下，并新建压缩文件） /data（数据容器中要备份的数据目录）
+
 #验证操作:
-ls /backup
-zcat /backup/data.tar.gz
+$ ls ./testdata
+$ zcat ./testdata/data.tar.gz
+# 解压缩查看
+$ tar -zxvf ./testdata/data.tar.gz
 ```
 
-### 
+> -P：使用原文件的原来属性（属性不会依据使用者而变），恢复字段到它们的原始方式，忽略现有的用户权
+> 限屏蔽位（umask)。 加了-p之后，tar进行解压后，生成的文件的权限，是直接取自tar包里面文件的权限（不会再使用该用户的umask值进行运算），那么不加-p参数，将还要再减去umask的值（位运算的减），但是如果使用root用户进行操作，加不加-p参数都一样。
+
+###4）：数据还原
+
+![Docker_数据恢复](assets/Docker_数据恢复.jpg)
+
+数据恢复方案：
+
+> 1. 创建一个新的数据卷容器（或删除原数据卷容器的内容）
+> 2. 创建一个新容器，挂载数据卷容器，同时挂载本地的备份目录作为数据卷
+> 3. 将要恢复的数据解压到容器中
+> 4. 完成还原操作后销毁刚创建的容器
+
+```shell
+# 命令格式：
+docker run --rm -itd --volumes-from [数据要到恢复的容器] -v [宿主机备份目录]:[容器备份目录]
+[镜像名称] [解压命令]
+# 命令实践：
+# 启动数据卷容器: 
+$ docker start nginx-data1
+# 删除源容器内容:
+$ docker exec -it nginx-data1 bash
+root@c408f4f14786:/# rm -rf /data/*
+
+# 数据恢复
+$ docker run --rm --volumes-from nginx-data1 -v /home/darry/testdata/:/backup/ nginx tar xPf /backup/data.tar.gz -C /data
+# 说明
+# docker run --rm --volumes-from nginx-data1(要恢复的数据容器) -v /home/darry/testdata/（宿主机目录）:/backup/（容器目录） nginx tar xPf /backup/data.tar.gz（容器目录里的压缩文件） -C /data（将容器中的压缩文件解压到要恢复的数据容器中的目录下，这里是/data，实际根据自己容器中的目录）
+# 进入相关容器验证
+$ docker exec nginx-data2 /bin/bash
+# 进入容器查看相关目录下的文件
+```
+
+> 解压的时候，如果使用目录的话，一定要在解压的时候使用 -C 指定挂载的数据卷容器，不然的话容器数据
+> 是无法恢复的，因为容器中默认的backup目录不是数据卷，即使解压后，也看不到文件。
