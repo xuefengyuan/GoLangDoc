@@ -474,15 +474,15 @@ $ docker exec nginx-data2 /bin/bash
 方案二：未验证，但效果跟上面是一样的
 
 ```shell
-#新建新的数据卷容器：
+# 新建新的数据卷容器：
 $ docker create -v /newdata --name nginxg-data4 nginx
 # 建立新的容器挂载数据卷容器
 $ docker run --volumes-from nginxg-data4 -tid --name nginxg-data5 nginx /bin/bash
-#恢复数据：
+# 恢复数据：
 docker run --rm --volumes-from nginxg-data4 -v /home/darry/testdata/:/backup/ nginx tar
 xPf /backup/data.tar.gz -C /newdata
-#验证:
-:~$ docker exec -it nginxg-data5 /bin/bash
+# 验证:
+$ docker exec -it nginxg-data5 /bin/bash
 root@c408f4f14786:/# ls /newdata
 ```
 
