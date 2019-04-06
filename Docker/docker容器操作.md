@@ -470,3 +470,19 @@ $ docker exec nginx-data2 /bin/bash
 
 > 解压的时候，如果使用目录的话，一定要在解压的时候使用 -C 指定挂载的数据卷容器，不然的话容器数据
 > 是无法恢复的，因为容器中默认的backup目录不是数据卷，即使解压后，也看不到文件。
+
+方案二：未验证，但效果跟上面是一样的
+
+```shell
+#新建新的数据卷容器：
+$ docker create -v /newdata --name nginxg-data4 nginx
+# 建立新的容器挂载数据卷容器
+$ docker run --volumes-from nginxg-data4 -tid --name nginxg-data5 nginx /bin/bash
+#恢复数据：
+docker run --rm --volumes-from nginxg-data4 -v /home/darry/testdata/:/backup/ nginx tar
+xPf /backup/data.tar.gz -C /newdata
+#验证:
+:~$ docker exec -it nginxg-data5 /bin/bash
+root@c408f4f14786:/# ls /newdata
+```
+
