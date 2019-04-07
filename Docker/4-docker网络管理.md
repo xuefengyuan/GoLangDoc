@@ -398,26 +398,26 @@ $ 	docker network inspect bridge
 # 1、网桥环境部署
     # 1.1 网桥软件部署
     # ubuntu默认不自带网桥管理工具，安装网桥软件
-    sudo apt-get install bridge-utils -y
+$   sudo apt-get install bridge-utils -y
     #查看网卡
-    brctl show
+$   brctl show
     #1.2 创建网桥
-    sudo brctl addbr br0
-    brctl show
+$   sudo brctl addbr br0
+$   brctl show
 
 # 给网桥设置网段
-sudo ifconfig br0 192.168.99.1 netmask 255.255.255.0
-ifconfig
+$ sudo ifconfig br0 192.168.99.1 netmask 255.255.255.0
+$ ifconfig
 
 # 2、docker配置网桥
     # 2.1 配置docker文件,我的这个目录下没有这个文件，要新建，方案是上面那个
-    sudo vim /etc/default/docker
+$   sudo vim /etc/default/docker
     # 最末尾添加
     DOCKER_OPTS="-b=br0"
     # 2.2 systemctl使用docker文件
     # 创建服务依赖文件
-    sudo mkdir -p /etc/systemd/system/docker.service.d
-    sudo vim /etc/systemd/system/docker.service.d/Using_Environment_File.conf
+$   sudo mkdir -p /etc/systemd/system/docker.service.d
+$   sudo vim /etc/systemd/system/docker.service.d/Using_Environment_File.conf
     # 内容如下：
     [Service]
     EnvironmentFile=-/etc/default/docker
@@ -425,23 +425,23 @@ ifconfig
     ExecStart=/usr/bin/dockerd -H fd:// $DOCKER_OPTS
       
     # 重载服务配置文件
-    systemctl daemon-reload
+$   systemctl daemon-reload
 
     # 2.3 重启docker
     # 重启前效果
-    ps aux |grep docker
+$   ps aux |grep docker
     # 重启
-    systemctl restart docker
+$   systemctl restart docker
     # 重启后效果
-    ps aux |grep docker
+$   ps aux |grep docker
 
 # 3、容器测试
     # 3.1 创建容器并测试
     # 创建默认网络的容器
-    docker run -itd --name nginx--3 nginx
-    docker ps
+$   docker run -itd --name nginx--3 nginx
+$   docker ps
     # 查看信息已经使用了br0的网卡的网络
-    docker inspect 92d4b5e434d2
+$   docker inspect 92d4b5e434d2
 ```
 
 
