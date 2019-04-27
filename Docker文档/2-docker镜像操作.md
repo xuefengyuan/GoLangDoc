@@ -85,6 +85,8 @@ $ docker tag nginx:latest panda-nginx:v1.0
 
 #### 5）：删除镜像
 
+> 删除镜像时，需要先把依赖的容器删除
+
 ```shell
 # 命令格式：
 $ docker rmi [命令参数][镜像ID]
