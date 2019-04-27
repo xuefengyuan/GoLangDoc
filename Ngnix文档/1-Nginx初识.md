@@ -129,6 +129,7 @@ drwxrwxr-x 9 darry darry    4096 4月  20 12:04 src
 ```shell
 # 使用make install安装，安装完成后可以进入安装目录查看安装后的文件
 $ make install
+# 进入安装目录查看 
 $ cd /home/darry/nginx
 $ ls -l 
 drwxrwxr-x 2 darry darry 4096 4月  20 12:15 conf
@@ -140,6 +141,112 @@ drwxrwxr-x 2 darry darry 4096 4月  20 12:15 sbin
 # access.log 和error.log日志目录
 # sbin 二进制执行文件目录
 ```
+
+## 六、Nginx配置文件的通用语法
+
+### 1、配置指令说明
+
+> 1. 配置文件由指令与指令块构成
+> 2. 每条指令以 ; 号结尾，指令与参数间以空格符分隔
+> 3. 指令块以{ } 大括号将多条指令组织在一起
+> 4. include语句允许组合多个配置文件以提升可维护性
+> 5. 使用#符号添加注释，提高可读性
+> 6. 使用$符号使用变量
+> 7. 部分指令的参数支持正则表达式
+
+### 2、配置参数：时间单位
+
+| ms   | milliseconds | 毫秒 | d    | days           | 天   |
+| ---- | ------------ | ---- | ---- | -------------- | ---- |
+| s    | seconds      | 秒   | w    | weeks          | 周   |
+| m    | minutes      | 分   | M    | months, 30days | 月   |
+| h    | hours        | 时   | y    | years, 365days | 年   |
+
+### 3、配置参数：空间单位
+
+|      | bytes     | 不加表示字节 |
+| ---- | --------- | ------------ |
+| k/K  | kilobytes | 1024 byte    |
+| m/M  | megabytes | 1204 k/K     |
+| g/G  | gigabytes | 1024 m/M     |
+
+### 4、http配置的指令块
+
+#### 4.1、http
+
+>  http{ } 标识里面所有指令都属于http模块
+
+#### 4.2、upstream
+
+> 上游服务模块，一般用来做转发
+
+#### 4.3、server
+
+> 对应一个域名，或者一组域名
+
+#### 4.4、location
+
+> 对应一个url表达式
+
+## 七、Nginx 基本操作命令
+
+```shell
+# nginx 帮助命令
+$ ./nginx -h
+
+nginx version: nginx/1.15.8
+Usage: nginx [-?hvVtTq] [-s signal] [-c filename] [-p prefix] [-g directives]
+
+Options:
+  -?,-h         : this help
+  -v            : show version and exit
+  -V            : show version and configure options then exit
+  -t            : test configuration and exit
+  -T            : test configuration, dump it and exit
+  -q            : suppress non-error messages during configuration testing
+  -s signal     : send signal to a master process: stop, quit, reopen, reload
+  -p prefix     : set prefix path (default: /home/darry/nginx/)
+  -c filename   : set configuration file (default: conf/nginx.conf)
+  -g directives : set global directives out of configuration file
+# 加载指定的配置文件
+$ sudo ./nginx -c ../nginx.conf
+# 指定配置指令
+$ ./nginx -g  
+# 指定运行目录
+$ ./nginx -p 
+# 测试配置文件是否有语法错误
+$ ./nginx -t
+
+# nginx 信号指令
+
+# 重载配置文件
+$ ./nginx -s reload
+# 立刻停止服务
+$ ./nginx -s stop
+# 优雅的停止服务
+$ ./nginx -s quid
+# 重新开始记录日志文件
+$ ./nginx -s rcopen
+# 平滑的重启nginx
+$ ps -ef | grep ngix
+$ kill -HUP 进程id
+# nginx 热部署，把编译后的nginx执行文件拷贝到进程中所执行的nginx所在目录下
+$ kill -USR2 进程id
+# 热部署后，新的master进程启动，老的worker进程还在，
+# worker进程会慢慢的过渡到新的master进程，并且不在对端口进行监听
+# 通知老的进程优雅的关闭
+$ kill -WINCH 进程id
+# 日志切割，先把之前的日志文件进行备份，需要注意的是nginx的日志所在目录
+$ mv access.log bak.log
+$ sudo ../sbin/nginx -s reopen
+
+```
+
+
+
+
+
+
 
 
 
