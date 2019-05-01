@@ -242,6 +242,66 @@ $ sudo ../sbin/nginx -s reopen
 
 ```
 
+### 7.1、Nginx gzip配置
+
+```nginx
+# 打开gzip压缩
+gzip on;
+# 小于1字节的文件不压缩，可动态配置
+gzip_min_length 1;
+# gzip的压缩级别
+gzip_comp_level 2;
+# 针对某些文件进行压缩
+gzip_types text/plain application/x-javascript text/scc application/xml text/javascript application/x-httpd-php image/jpeg image/gif image/png;
+```
+
+## 八、Nginx反向代理
+
+```nginx
+server {
+    # 添加了127.0.0.1标识只能本机访问
+          listen       127.0.0.1:8989;
+          server_name  geek.ybd.pub;
+		.....
+}
+```
+
+个性配置后需要停止之前的nginx然后重新启动
+
+```shell
+# 停止之前的nginx
+$ sudo ./sbin/nginx -s stop
+# 重新启动服务，加载指定的配置文件
+$ sudo ./sbin/nginx -c ./conf/nginx.conf
+```
+
+
+
+```nginx
+# local 表示是服务名称，可以自定义
+upstream local{
+    server 127.0.0.1:8989
+}
+server{
+    # 这里指定一个域名访问
+    server_name www.ybd.com;
+    listen 8899;
+    location / {
+             #alias dlib/;
+             #root   html;
+             #index  index.html index.htm;
+        	 # 这里是指定代理到上面定义的服务中
+        	 proxy_pass http://local;
+          }
+
+}
+
+```
+
+
+
+
+
 
 
 
