@@ -51,6 +51,51 @@ for i:=0; i < 1000; i++{
 
 
 
+四、golang带证书访问接口
+
+```go
+// certf 证书路径
+// key路径 
+func HttpRequest(url, certf, keyf string) error {
+	
+	pool := x509.NewCertPool()
+
+	caCrt, err := ioutil.ReadFile(certf)
+	if err != nil {
+		glog.Error("ReadFile err:", err)
+		return err
+	}
+	pool.AppendCertsFromPEM(caCrt)
+
+	cliCrt, err := tls.LoadX509KeyPair(certf, keyf)
+	if err != nil {
+		glog.Error("Loadx509keypair err:", err)
+		return err
+	}
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs:            pool,
+			Certificates:       []tls.Certificate{cliCrt},
+			InsecureSkipVerify: true,
+		},
+		DisableKeepAlives: true,
+	}
+	client := &http.Client{Transport: tr, Timeout: 60 * time.Second}
+
+	req, err := http.NewRequest("GET", url, nil)
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	json.Unmarshal(body, rsp)
+	return nil
+}
+```
+
 
 
 
