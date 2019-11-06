@@ -84,6 +84,11 @@ $ sudo apt-get install openssl libssl-dev -y
 $ sudo apt-get install libpcre3 libpcre3-dev -y
 $ sudo apt-get install zlib1g-dev
 
+# 批量安装
+$ sudo apt-get install -y zlib1g-dev build-essential openssl libssl-dev libpcre3 libpcre3-dev -y
+# contOS 系统
+$ yum -y install make zlib zlib-devel gcc-c++ libtool openssl openssl-devel pcre pcre-devel
+
 # 编译到指定目录下，使用默认编译方式
 $ ./configure --prefix=/home/darry/nginx
 
@@ -217,6 +222,9 @@ $ ./nginx -p
 # 测试配置文件是否有语法错误
 $ ./nginx -t
 
+# nginx启动后在CentOS系统下外部可能无法访问，需要执行下面命令
+$ /sbin/iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+
 # nginx 信号指令
 
 # 重载配置文件
@@ -224,7 +232,7 @@ $ ./nginx -s reload
 # 立刻停止服务
 $ ./nginx -s stop
 # 优雅的停止服务
-$ ./nginx -s quid
+$ ./nginx -s quit
 # 重新开始记录日志文件
 $ ./nginx -s rcopen
 # 平滑的重启nginx
