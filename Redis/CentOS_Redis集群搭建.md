@@ -100,25 +100,55 @@ type key
 # 创建软件配置目录和Redis数据目录
 $ mkdir -p /data/reids_cluster/redis_{9000,9100}/{conf,data,logs,pid}
 
+$ vim /data/redis_cluster/redis_9000/conf/redis-master-9000.conf
 # Redis master 主节点配置
+
+bind 0.0.0.0
+port 9000
+daemonize yes
+pidfile "/data/redis_cluster/redis_9000/pid/redis-master-9000.pid"
+logfile "/data/redis_cluster/redis_9000/logs/redis-master-9000.log"
+dir "/data/redis_cluster/redis_9000/data"
+dbfilename "redis-master-9000.rdb"
+cluster-enabled yes
+cluster-config-file "/data/redis_cluster/redis_9000/conf/nodes-master-9000.conf"
+cluster-node-timeout 15000
+
+# 加id绑定需要再验证一遍
+
 bind 192.168.129.137
 port 9000
 daemonize yes
 pidfile "/data/redis_cluster/redis_9000/pid/redis-master-9000.pid"
 logfile "/data/redis_cluster/redis_9000/logs/redis-master-9000.log"
+dir "/data/redis_cluster/redis_9000/data/"
 dbfilename "redis-master-9000.rdb"
 cluster-enabled yes
-cluster-config-file "/data/redis_cluster/redis_9000/conf/nodes-master-0000.conf"
+cluster-config-file "/data/redis_cluster/redis_9000/conf/nodes-master-9000.conf"
 cluster-node-timeout 15000
 
-
+$ vim /data/redis_cluster/redis_9100/conf/redis-slave-9100.conf
 # Redis Slave 从节点配置（从主节点上复制一份配置，修改对应的参数）
+
+bind 0.0.0.0 
+port 9100
+daemonize yes
+pidfile "/data/redis_cluster/redis_9100/pid/redis-slave-9100.pid"
+logfile "/data/redis_cluster/redis_9100/logs/redis-slave-9100.log"
+dbfilename "redis-slave-9100.rdb"
+dir "/data/redis_cluster/redis_9100/data/"
+cluster-enabled yes
+cluster-config-file "/data/redis_cluster/redis_9100/conf/nodes-slave-9100.conf"
+cluster-node-timeout 15000
+
+# 加ip绑定需要再验证一遍
 bind 192.168.129.137
 port 9100
 daemonize yes
 pidfile "/data/redis_cluster/redis_9100/pid/redis-slave-9100.pid"
 logfile "/data/redis_cluster/redis_9100/logs/redis-slave-9100.log"
 dbfilename "redis-slave-9100.rdb"
+dir "/data/redis_cluster/redis_9100/data/"
 cluster-enabled yes
 cluster-config-file "/data/redis_cluster/redis_9100/conf/nodes-slave-9100.conf"
 cluster-node-timeout 15000
@@ -151,6 +181,75 @@ b2fd1bb95b224763ebef88d6958240819c559ecb :9000@19000 myself,master - 0 0 0 conne
 
 ```
 
+### 3.5、其它机器的配置
+
+```shell
+# 将整个文件夹复制到远程机器上
+$ scp -r ./redis_cluster root@192.168.129.134:/data/
+
+# 如果配置文件没问题，可以在上面没启动redis之前将文件夹复制到别的机器，可以省去删文件操作
+# 将第一台机器启动的相关文件删除
+rm /data/redis_cluster/redis_9000/conf/nodes-master-0000.conf
+rm /data/redis_cluster/redis_9100/conf/nodes-slave-9100.conf 
+rm /data/redis_cluster/redis_9000/logs/redis-master-9000.log
+rm /data/redis_cluster/redis_9100/logs/redis-slave-9100.log
+rm /data/redis_cluster/redis_9000/pid/redis-master-9000.pid
+rm /data/redis_cluster/redis_9100/pid/redis-slave-9100.pid 
+
+# 将复制过去的配置文件redis-master-9000.conf和redis-slave-9100.conf中的ip修改掉
+# 一定要记得将复制过去的配置文件bind对应的ip改掉
+bind 192.168.129.134
+
+# 修改文件后并启动对应机器的redis
+```
+
+### 3.6、创建集群
+
+```shell
+./redis-cli --cluster create 192.168.129.137:9000 192.168.129.134:9000 192.168.129.135:9000 192.168.129.137:9100 192.168.129.134:9100 192.168.129.135:9100 --cluster-replicas 1
+
+# 创建的时候局域网会有防火墙问题（下面的ip需要改为实际的和开放端口号）
+# 下面这些命令在每台机器都执行一遍
+iptables -N REDIS
+iptables -A REDIS -s 192.168.129.137 -j ACCEPT
+iptables -A REDIS -s 192.168.129.134 -j ACCEPT
+iptables -A REDIS -s 192.168.129.135 -j ACCEPT
+iptables -A REDIS -j LOG --log-prefix "unauth-redis-access"
+iptables -A REDIS -j REJECT --reject-with icmp-port-unreachable
+iptables -I INPUT -p tcp --dport 9000 -j REDIS
+iptables -I INPUT -p tcp --dport 9100 -j REDIS
+iptables -I INPUT -p tcp --dport 19000 -j REDIS
+iptables -I INPUT -p tcp --dport 19100 -j REDIS
+
+# 查看集群信息
+$ cat redis_cluster/redis_9000/conf/nodes-master-9000.conf 
+4a571f0d72d501de1980f3fd62a00219bb03a36a 192.168.129.137:9100@19100 slave 174d66b63d87e8a112981f2aee8bafa34a1dd019 0 1573743531684 4 connected
+8f6e82761d47da53589c644f566805601385a392 192.168.129.134:9100@19100 slave 7b9987dc514fd68ad963e6aa7441adb5e2cfc1f9 0 1573743530676 5 connected
+7b9987dc514fd68ad963e6aa7441adb5e2cfc1f9 192.168.129.137:9000@19000 myself,master - 0 1573743530000 1 connected 0-5460
+174d66b63d87e8a112981f2aee8bafa34a1dd019 192.168.129.135:9000@19000 master - 0 1573743531000 3 connected 10923-16383
+63320d6a6ccc22b463637d141bb271de0c825ce2 192.168.129.134:9000@19000 master - 0 1573743529667 2 connected 5461-10922
+3f0f9dff449c75be8003a9eb7575078adf39e6ed 192.168.129.135:9100@19100 slave 63320d6a6ccc22b463637d141bb271de0c825ce2 0 1573743530000 6 connected
+vars currentEpoch 6 lastVoteEpoch 0
+
+
+
+```
+
+### 3.7、连接集群测试
+
+```shell
+# 每机机器登录集群，注意每台机器的ip
+$ ./redis/src/redis-cli -c -h 192.168.129.137 -p 9100
+```
+
+
+
+
+
+
+
+
+
 3.5、手动配置节点发现
 
 > 在集群内任意一台机器执行节点发现命令就可以
@@ -165,17 +264,7 @@ $ ./data/redis/src/redis-cli -h 192.168.129.137 -p 9000
 192.168.129.137:9000> cluster nodes
 ```
 
-
-
-
-
-
-
-
-
-
-
-
+### 
 
 
 
