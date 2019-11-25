@@ -189,16 +189,7 @@ $ scp -r ./redis_cluster root@192.168.129.134:/data/
 
 # 如果配置文件没问题，可以在上面没启动redis之前将文件夹复制到别的机器，可以省去删文件操作
 # 将第一台机器启动的相关文件删除
-rm /data/redis_cluster/redis_9000/conf/nodes-master-9000.conf
-rm /data/redis_cluster/redis_9100/conf/nodes-slave-9100.conf 
-rm /data/redis_cluster/redis_9000/logs/redis-master-9000.log
-rm /data/redis_cluster/redis_9100/logs/redis-slave-9100.log
-rm /data/redis_cluster/redis_9000/pid/redis-master-9000.pid
-rm /data/redis_cluster/redis_9100/pid/redis-slave-9100.pid 
-rm /data/redis_cluster/redis_9000/data/redis-master-9000.rdb
-rm /data/redis_cluster/redis_9100/data/redis-slave-9100.rdb
-
-rm /data/redis_cluster/redis_9000/conf/nodes-master-9000.conf /data/redis_cluster/redis_9100/conf/nodes-slave-9100.conf /data/redis_cluster/redis_9000/logs/redis-master-9000.log /data/redis_cluster/redis_9100/logs/redis-slave-9100.log /data/redis_cluster/redis_9000/pid/redis-master-9000.pid /data/redis_cluster/redis_9100/pid/redis-slave-9100.pid /data/redis_cluster/redis_9000/data/redis-master-9000.rdb /data/redis_cluster/redis_9100/data/redis-slave-9100.rdb
+$ rm /data/redis_cluster/redis_9000/conf/nodes-master-9000.conf /data/redis_cluster/redis_9100/conf/nodes-slave-9100.conf /data/redis_cluster/redis_9000/logs/redis-master-9000.log /data/redis_cluster/redis_9100/logs/redis-slave-9100.log /data/redis_cluster/redis_9000/pid/redis-master-9000.pid /data/redis_cluster/redis_9100/pid/redis-slave-9100.pid /data/redis_cluster/redis_9000/data/redis-master-9000.rdb /data/redis_cluster/redis_9100/data/redis-slave-9100.rdb
 
 # 将复制过去的配置文件redis-master-9000.conf和redis-slave-9100.conf中的ip修改掉
 # 一定要记得将复制过去的配置文件bind对应的ip改掉
@@ -211,7 +202,7 @@ $ netstat -lntup | grep redis
 # 集群通信端口要开放
 
 # 杀死全部Redis进程命令
-pgrep redis | xargs kill -s 9
+$ pgrep redis | xargs kill -s 9
 ```
 
 ### 3.6、创建集群
@@ -219,17 +210,27 @@ pgrep redis | xargs kill -s 9
 ```shell
 
 # 创建的时候局域网会有防火墙问题（下面的ip需要改为实际的和开放端口号）
-# 下面这些命令在每台机器都执行一遍
+# 下面这些命令在每台机器都执行一遍，注意自己本地IP和允许访问IP都要添加
+
 iptables -N REDIS
 iptables -A REDIS -s 192.168.129.137 -j ACCEPT
 iptables -A REDIS -s 192.168.129.134 -j ACCEPT
 iptables -A REDIS -s 192.168.129.135 -j ACCEPT
+iptables -A REDIS -s 192.168.129.131 -j ACCEPT
 iptables -A REDIS -j LOG --log-prefix "unauth-redis-access"
 iptables -A REDIS -j REJECT --reject-with icmp-port-unreachable
 iptables -I INPUT -p tcp --dport 9000 -j REDIS
 iptables -I INPUT -p tcp --dport 9100 -j REDIS
 iptables -I INPUT -p tcp --dport 19000 -j REDIS
 iptables -I INPUT -p tcp --dport 19100 -j REDIS
+
+# 查看防火墙规则
+iptables -nL --line-number
+# 重启防火墙
+systemctl restart firewalld.service
+
+iptables -A INPUT -s 192.168.129.131 -p tcp --dport 9000 -j ACCEPT
+iptables -A INPUT -s 192.168.129.131 -p tcp --dport 9100 -j ACCEPT
 
 
 ./data/redis/src/redis-cli --cluster create 192.168.129.137:9000 192.168.129.134:9000 192.168.129.135:9000 192.168.129.137:9100 192.168.129.134:9100 192.168.129.135:9100 --cluster-replicas 1
@@ -279,10 +280,11 @@ CLUSTER FAILOVER
 ```shell
 # 准备需要扩容的机器，安装redis和配置相应的配置文件
 # 拿上面的配置文件复制到新机器，修改ip还需要开放相应的端口
-# 新机器ip 192.168.129.136
+# 如果是内网机器有防火墙的情况下，下面的命令在每台机器上都要重新执行一次，前提是要重启防火墙把之前的规则清除掉，可以写成脚本
+# 新机器ip 192.168.129.131
 
 iptables -N REDIS
-iptables -A REDIS -s 192.168.129.136 -j ACCEPT
+iptables -A REDIS -s 192.168.129.131 -j ACCEPT
 iptables -A REDIS -s 192.168.129.137 -j ACCEPT
 iptables -A REDIS -s 192.168.129.134 -j ACCEPT
 iptables -A REDIS -s 192.168.129.135 -j ACCEPT
@@ -293,8 +295,6 @@ iptables -I INPUT -p tcp --dport 9100 -j REDIS
 iptables -I INPUT -p tcp --dport 19000 -j REDIS
 iptables -I INPUT -p tcp --dport 19100 -j REDIS
 
-# 其它三台机器也要执行下面的命令
-iptables -A REDIS -s 192.168.129.136 -j ACCEPT
 
 # 启动redis服务，查看进程
 $ ./data/redis/src/redis-server ./data/redis_cluster/redis_9000/conf/redis-master-9000.conf 
@@ -303,59 +303,44 @@ $ netstat -lntup | grep redis
 
 ```
 
-4.2、扩容准备
-
-```shell
-# 将新机器加入到集群中，在其它三台机器任意一台登录到redis集群中执行添加
-192.168.129.137:9000> CLUSTER MEET 192.168.129.136 9000
-OK
-192.168.129.137:9000> CLUSTER MEET 192.168.129.136 9100
-OK
-
-# 查看集群状态，发现192.168.129.136 两个900和9100端口的redis加入进来了
-192.168.129.137:9000> CLUSTER NODES
-7e9b81293e2e35e654809913878d9dcb7d50a3db 192.168.129.137:9100@19100 slave e9d6d810b97b252d8f640f9af10290776d035f6b 0 1574175612834 4 connected
-a7de4f727496b4109c4779a202c971c3635f44b4 192.168.129.134:9100@19100 slave 055b5ec1b5e33772ae966eb0764c6caf9716f8bd 0 1574175610513 5 connected
-c3756d927fd0dceffa21972435e7b01f7ac542cf 192.168.129.135:9100@19100 slave 22aa0fd4a2c58542a8cecd6c2e4657227adcbf80 0 1574175610815 6 connected
-2455032622b974efb918b94340af7fca96fc4578 192.168.129.136:9100@19100 master - 0 1574175609000 0 connected
-22aa0fd4a2c58542a8cecd6c2e4657227adcbf80 192.168.129.134:9000@19000 master - 0 1574175611000 2 connected 5461-10922
-efe22cd0de209e445856163cf6f50b6d64d429ee 192.168.129.136:9000@19000 master - 0 1574175612000 0 connected
-055b5ec1b5e33772ae966eb0764c6caf9716f8bd 192.168.129.137:9000@19000 myself,master - 0 1574175611000 1 connected 0-5460
-e9d6d810b97b252d8f640f9af10290776d035f6b 192.168.129.135:9000@19000 master - 0 1574175610000 3 connected 10923-16383
-
-# Redis 有16384个哈希槽位，必需全部分配完集群才可以正常使用
-0-16383 
-13684/4 = 4096 （每台机器的哈希槽位数）
-
-```
-
 ### 4.2、Redis扩容
 
 ```shell
-# 添加master节点 如果添加多台机器，中间空格分开
-./data/redis/src/redis-cli --cluster add-node 192.168.129.136:9000 
+# 添加节点有两种方式
+# 1.1 添加master节点 如果添加多台机器，中间空格分开
+./data/redis/src/redis-cli --cluster add-node 192.168.129.131:9000 92.168.129.137:9000
+# add-node 这里如果要加入多个节点，最后面一个要当前集群内的ip和端口
 
-这里是将节点加入了集群中，但是并没有分配slot，所以这个节点并没有真正的开始分担集群工作。
+# 1.2 添加节点(登录进redis进行添加)
+./data/redis/src/redis-cli -c -h 192.168.129.137 -p 9000 CLUSTER MEET 192.168.129.131:9100
 
-（3）分配slot
+# 这里是将节点加入了集群中，但是并没有分配slot，所以这个节点并没有真正的开始分担集群工作。
 
-redis-cli --cluster reshard 127.0.0.1:6379 --cluster-from 2846540d8284538096f111a8ce7cf01c50199237,e0a9c3e60eeb951a154d003b9b28bbdc0be67d5b,692dec0ccd6bdf68ef5d97f145ecfa6d6bca6132 --cluster-to 46f0b68b3f605b3369d3843a89a2b4a164ed21e8 --cluster-slots 1024
+# 2 给新加入的机器分配slot（哈希槽）
+./data/redis/src/redis-cli --cluster reshard 192.168.129.137:9000 --cluster-from 8abc7fcb5c0116afdaa511863b5031bee01e7a39, cdba92799f7008728ef977334c879342e60b6c70, faeb72fe504b6f73d99b31d70574e08c709c66b3 --cluster-to 8666f8658bad42ea3d583d551afc4646799dae15 --cluster-slots 4096
 
 # --cluster-from：表示slot目前所在的节点的node ID，多个ID用逗号分隔
 # --cluster-to：表示需要新分配节点的node ID（貌似每次只能分配一个）
 # --cluster-slots：分配的slot数量
 
-（4）添加slave节点
+# 4 添加slave节点
+./data/redis/src/redis-cli --cluster add-node 192.168.129.131:9100 192.168.129.134:9000 --cluster-slave --cluster-master-id 8abc7fcb5c0116afdaa511863b5031bee01e7a39
 
-redis-cli --cluster add-node 127.0.0.1:6386 127.0.0.1:6385 --cluster-slave --cluster-master-id 46f0b68b3f605b3369d3843a89a2b4a164ed21e8
-
-# add-node: 后面的分别跟着新加入的slave和slave对应的master
+# add-node: 后面的分别跟着新加入的slave和slave对应的master(add-node后面要有两个地址)
 # cluster-slave：表示加入的是slave节点
 # --cluster-master-id：表示slave对应的master的node ID
 
 ```
 
+### 4.3、重新分配Slave对应的Master
 
+```shell
+# 登录进需要重新分配的Slave节点，后面的为新的Master的id  
+
+192.168.129.134:9100> CLUSTER REPLICATE 8666f8658bad42ea3d583d551afc4646799dae15
+
+# 重新分配从节点，是有可能在别的主节点挂了，重新选举了主节点，也可以用修复的方式让之前的主节点重新恢复
+```
 
 
 
