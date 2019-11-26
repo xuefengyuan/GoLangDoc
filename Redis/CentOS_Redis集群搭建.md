@@ -6,6 +6,10 @@
 
 ## 一、Redis 集群架构图
 
+> 系统为：CentOS 7.6
+>
+> Redis为：5.0.7
+>
 > 主节点的端口全为：9000
 >
 > 从节点的端口全为：9100
@@ -16,12 +20,12 @@
 
 ```shell
 # 下载
-$ wget http://download.redis.io/releases/redis-5.0.6.tar.gz
+$ wget http://download.redis.io/releases/redis-5.0.7.tar.gz
 
 # 解压
-$ tar -zxvf redis-5.0.6.tar.gz
-$ cp -r ./redis-5.0.6 ./redis
-$ rm -rf ./redis-5.0.6
+$ tar -zxvf redis-5.0.7.tar.gz
+$ cp -r ./redis-5.0.7 ./redis
+$ rm -rf ./redis-5.0.7
 
 # 编译安装需要gcc环境
 $ yum -y install gcc-c++
@@ -212,6 +216,11 @@ $ pgrep redis | xargs kill -s 9
 # 创建的时候局域网会有防火墙问题（下面的ip需要改为实际的和开放端口号）
 # 下面这些命令在每台机器都执行一遍，注意自己本地IP和允许访问IP都要添加
 
+# 查看防火墙规则
+iptables -nL --line-number
+# 重启防火墙
+systemctl restart firewalld.service
+
 iptables -N REDIS
 iptables -A REDIS -s 192.168.129.137 -j ACCEPT
 iptables -A REDIS -s 192.168.129.134 -j ACCEPT
@@ -224,16 +233,13 @@ iptables -I INPUT -p tcp --dport 9100 -j REDIS
 iptables -I INPUT -p tcp --dport 19000 -j REDIS
 iptables -I INPUT -p tcp --dport 19100 -j REDIS
 
-# 查看防火墙规则
-iptables -nL --line-number
-# 重启防火墙
-systemctl restart firewalld.service
+# iptables -A INPUT -s 192.168.129.131 -p tcp --dport 9000 -j ACCEPT
+# iptables -A INPUT -s 192.168.129.131 -p tcp --dport 9100 -j ACCEPT
 
-iptables -A INPUT -s 192.168.129.131 -p tcp --dport 9000 -j ACCEPT
-iptables -A INPUT -s 192.168.129.131 -p tcp --dport 9100 -j ACCEPT
-
-
+# 创建集群
 ./data/redis/src/redis-cli --cluster create 192.168.129.137:9000 192.168.129.134:9000 192.168.129.135:9000 192.168.129.137:9100 192.168.129.134:9100 192.168.129.135:9100 --cluster-replicas 1
+
+# cluster-replicas 指定一个Master有有一个Slave节点
 
 # 检查集群状态
 $ ./data/redis/src/redis-cli --cluster check 192.168.129.134:9000
@@ -273,6 +279,14 @@ CLUSTER INFO
 CLUSTER FAILOVER
 ```
 
+### 3.9、修复后的Master重新上线
+
+```shell
+# 登录到修复节点的Redis
+# 通过以下命令 CLUSTER FAILOVER 让节点重新上线
+192.168.129.134:9000> CLUSTER FAILOVER
+```
+
 ## 四、Redis集群扩容
 
 ### 4.1、新机器的配置和Redis启动
@@ -294,7 +308,6 @@ iptables -I INPUT -p tcp --dport 9000 -j REDIS
 iptables -I INPUT -p tcp --dport 9100 -j REDIS
 iptables -I INPUT -p tcp --dport 19000 -j REDIS
 iptables -I INPUT -p tcp --dport 19100 -j REDIS
-
 
 # 启动redis服务，查看进程
 $ ./data/redis/src/redis-server ./data/redis_cluster/redis_9000/conf/redis-master-9000.conf 
@@ -347,7 +360,12 @@ $ netstat -lntup | grep redis
 ## 五、Redis集群缩容
 
 ```shell
-# 移除节点 需要移除节点的ip:port nodeid
+# 1、如果移除的是master节点，需要先把之前的哈希槽位分配到其它的节点上面去
+# 2、如果移除的是Slave节点，可以直接删除
+# 3、缩容的步骤跟扩容的步骤是反的
+
+
+# 前面的ip:port 是现有集群中的ip和端口，后面跟着的是要删除的节点id
 ./redis/src/redis-cli --cluster del-node 192.168.129.136:9000 efe22cd0de209e445856163cf6f50b6d64d429ee
 
 # 移除后在查看集群节点还能看到
@@ -357,25 +375,122 @@ CLUSTER FORGET nodeid
 CLUSTER FORGET efe22cd0de209e445856163cf6f50b6d64d429ee
 ```
 
-
-
-
-
-3.5、手动配置节点发现
-
-> 在集群内任意一台机器执行节点发现命令就可以
+### 5.1、重新分配哈希槽
 
 ```shell
-$ ./data/redis/src/redis-cli -h 192.168.129.137 -p 9000
-192.168.129.137:9000> cluster nodes
+# 从131的9000节点重新分配到137的9000节点
+./data/redis/src/redis-cli --cluster reshard 192.168.129.137:9000 --cluster-from 8666f8658bad42ea3d583d551afc4646799dae15 --cluster-to 8abc7fcb5c0116afdaa511863b5031bee01e7a39 --cluster-slots 5461
 
-# 添加节点发现命令 cluster mett {ip}{port}
-192.168.129.137:9000> cluster meet 192.168.129.137 9100
-# 查看节点信息
-192.168.129.137:9000> cluster nodes
+# 从131的9000节点重新分配到134的9000
+./data/redis/src/redis-cli --cluster reshard 192.168.129.137:9000 --cluster-from 8666f8658bad42ea3d583d551afc4646799dae15 --cluster-to 2b36c0bcc452b77371e8b7635b1ba7a855ec93dc --cluster-slots 5461
+
+# 从131的9000节点重新分配到135的9000
+./data/redis/src/redis-cli --cluster reshard 192.168.129.137:9000 --cluster-from 8666f8658bad42ea3d583d551afc4646799dae15 --cluster-to 2b36c0bcc452b77371e8b7635b1ba7a855ec93dc --cluster-slots 5462
 ```
 
-### 
+> 上面的命令执行完后，好像会自动对其它的master节点进行哈希槽重新分配，所以只需要执行一次就可以了。
+
+### 5.2、删除节点
+
+```shell
+# 先下线Slave节点
+./data/redis/src/redis-cli --cluster del-node 192.168.129.137:9000 952edb20892ec6be57ab32a79905c3c198845747
+# 下线master节点
+./data/redis/src/redis-cli --cluster del-node 192.168.129.137:9000 8666f8658bad42ea3d583d551afc4646799dae15
+
+# 执行上面命令后，对应的进程也会直接杀掉
+```
+
+## 六、防火墙脚本
+
+> 下面重启防火墙脚本在测试中发现不休眠一下，执行会有问题，所以每条命令之间间隔休眠一秒
+>
+> 下面的ip和9000、9100、19000、19100 是你redis对应的端口
+
+```shell
+#!/bin/bash
+echo 'restart start'
+systemctl restart firewalld.service
+echo 'restart end'
+echo 'set ip port start'
+sleep 1
+iptables -N REDIS
+sleep 1
+iptables -A REDIS -s 192.168.129.137 -j ACCEPT
+sleep 1
+iptables -A REDIS -s 192.168.129.134 -j ACCEPT
+sleep 1
+iptables -A REDIS -s 192.168.129.135 -j ACCEPT
+sleep 1
+iptables -A REDIS -s 192.168.129.131 -j ACCEPT
+
+sleep 1
+iptables -A REDIS -j LOG --log-prefix "unauth-redis-access"
+sleep 1
+iptables -A REDIS -j REJECT --reject-with icmp-port-unreachable
+sleep 1
+iptables -I INPUT -p tcp --dport 9000 -j REDIS
+sleep 1
+iptables -I INPUT -p tcp --dport 9100 -j REDIS
+sleep 1
+iptables -I INPUT -p tcp --dport 19000 -j REDIS
+sleep 1
+iptables -I INPUT -p tcp --dport 19100 -j REDIS
+
+echo 'set ip port end'
+```
+
+## 七、安装redis的简单脚本
+
+> 在测试的环境下，连接网络是通的，所以可以安装gcc-c++ 如果是内网机器连接不了网络，需要先安装gcc-c++环境，然后再执行编译
+>
+> 如果是离线安装，下载redis的下载gcc-c++可以省略，直接删除就行
+
+```shell
+#!/bin/bash
+redis_file_name="redis-5.0.7.tar.gz"
+redis_file_folder="redis-5.0.7"
+redis_new_folder="redis"
+redis_url="http://download.redis.io/releases/redis-5.0.7.tar.gz"
+# wget http://download.redis.io/releases/redis-5.0.7.tar.gz
+  # 先判断有没有下载redis的文件，没有的话就下载
+  if [ ! -f $redis_file_name ];then
+    echo 'No Redis File'
+	echo 'Download Redis File Start'
+	wget $redis_url
+	echo 'Download Redis File End'
+  fi
+
+  # 这里解压redis的tar压缩包
+  echo 'tar Redis File Start'
+  tar -zxvf $redis_file_name
+  
+  if [ ! -d $redis_new_folder ];then
+	rm -rf $redis_new_folder
+  fi
+
+  echo 'tar Redis File End'
+  # 将redis的文件夹复制一份，然后将之前的删除
+  echo 'cp move Redis File Start'
+  cp -r  $redis_file_folder $redis_new_folder
+  rm -rf $redis_file_folder
+  echo 'cp move Redis File End'
+  
+  # 下载gcc-c++编译环境
+  yum -y install gcc-c++
+
+  echo 'in redis folder'
+  cd /data/redis/src
+  
+  make && make install
+
+  echo 'install redis End'
+
+```
+
+
+
+
 
 
 
