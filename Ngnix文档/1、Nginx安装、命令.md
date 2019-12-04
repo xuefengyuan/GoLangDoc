@@ -13,6 +13,19 @@
 ### 1.1、下载Nginx
 
 ```shell
+# 关闭防火墙规则(生产环境不可以这样搞)
+# 查看防火墙规则
+$ iptables -L 
+$ iptables -t nat -L
+# 关闭规则
+$ iptables -F
+$ iptables -t nat -F
+
+# 关闭SELinux
+$ getenforce
+$ setenforce 0
+
+
 # 下载
 $ cd /data
 $ wget http://nginx.org/download/nginx-1.16.1.tar.gz
@@ -96,9 +109,29 @@ $ kill -WINCH 进程id
 # 日志切割，先把之前的日志文件进行备份，需要注意的是nginx的日志所在目录
 $ mv access.log bak.log
 $ ./nginx -s reopen
+
+# 查看Nginx版本信息
+$ ./nginx -v
+# 查看完整的Nginx配置信息(编译参数)(上面是小写，下面是大写)
+$ ./nginx -V
 ```
 
+### 1.5、Nginx安装目录
 
+```shell
+nginx
+├── client_body_temp
+├── conf # 配置文件目录
+├── fastcgi_temp
+├── html # 默认静态界面目录
+├── logs # 日志目录
+├── proxy_temp
+├── sbin # 二进制文件目录
+│   └── nginx
+├── scgi_temp
+└── uwsgi_temp
+
+```
 
 
 
